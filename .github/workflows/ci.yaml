@@ -15,10 +15,6 @@ concurrency:
   group: ci-${{ github.event.pull_request.head.sha || github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
-  RUST_TOOLCHAIN: "1.98.1"
-
 jobs:
   checks:
     name: 检查与测试
