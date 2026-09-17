@@ -1,22 +1,27 @@
 name: CI
 
+# 测试与安全门禁的编排者：并行调用 checks.yaml（测试/构建）与 security.yaml（安全），
+# CI run 完成即代表全部门禁通过，Gate 合并门禁汇总校验。
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
-  workflow_dispatch:
+  schedule:
+    - cron: "30 23 * * 0" # UTC 周日 23:30 ≈ 北京周一 07:30
 
 permissions:
   contents: read
 
+# 同一 PR 连续 push 时只保留最新一次运行（以 SHA 标识分组，杜绝乱序事件取消新 run）
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.head.sha || github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_TOOLCHAIN: "1.98.1"
+  RUST_TOOLCHAIN: "1.98.0"
 
 jobs:
   checks:

@@ -1,21 +1,66 @@
 name: Security
 
+# 可复用安全门禁：由 ci.yaml 通过 workflow_call 编排调用，
+# 触发时机（PR / push main / merge queue / 周一定时）由 CI workflow 统一管理。
+
 on:
   workflow_call:
 
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  audit:
-    name: 依赖与安全审计
+  # 密钥泄露扫描：采用官方 MIT 开源 CLI 原生执行，零 Docker 镜像开销，规则库自动跟随最新发布。
+  gitleaks:
+    name: 密钥泄露扫描
+    runs-on: ubuntu-latest
+    if: github.event_name != 'merge_group'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # 全量历史以完整扫描既往提交
+      - name: 安装 Gitleaks 官方原生 CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo gitleaks/gitleaks --pattern '*_linux_x64.tar.gz' --output - | sudo tar -xz -C /usr/local/bin gitleaks
+      - name: 执行全量 Git 历史与存量密钥扫描
+        run: gitleaks git --verbose --redact .
+
+  # 依赖漏洞（RustSec）与合规检查：原生极速二进制执行
+  cargo-deny:
+    name: 依赖检查
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2.87.13
+      - uses: taiki-e/install-action@6cd13508893c0e7eab5f273c2575d3859bd7229a # v2.85.12
         with:
           tool: cargo-deny
-      - name: 检查依赖安全与合规审计
+      - name: 检查依赖合规与安全漏洞
         run: cargo deny check advisories bans sources
+
+  # CodeQL 静态安全分析：Rust 无构建扫描（build-mode: none）。
+  codeql:
+    name: CodeQL 分析
+    runs-on: ubuntu-latest
+    if: github.event_name != 'merge_group' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@37f2634a92ba38a0926ef79a0748ac8ae7d95ab2 # v4.37.8
+        with:
+          languages: rust
+          build-mode: none
+          queries: ${{ (github.event_name == 'schedule' || github.ref == 'refs/heads/main') && 'security-extended' || '' }}
+      - uses: github/codeql-action/analyze@37f2634a92ba38a0926ef79a0748ac8ae7d95ab2 # v4.37.8
+        with:
+          category: "/language:rust"

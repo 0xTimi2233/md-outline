@@ -1,95 +1,243 @@
 name: Release
 
+# 本文件由 cargo-dist 生成并手工进行安全加固：
+# 1. 所有 action 严格锁定 commit SHA
+# 2. 顶层权限降为 contents: read，仅 host 发版 job 持有写权限
+# 3. tag 参数经环境变量传入 shell，避免 github.ref_name 注入
+
 permissions:
-  contents: write
+  contents: read
 
 on:
+  pull_request:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
-  workflow_dispatch:
+      - '**[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
-  build:
-    name: 构建跨平台二进制 (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
+  plan:
+    name: 规划发布清单
+    runs-on: ubuntu-latest
+    outputs:
+      val: ${{ steps.plan.outputs.manifest }}
+      tag: ${{ !github.event.pull_request && github.ref_name || '' }}
+      publishing: ${{ !github.event.pull_request }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: 安装 dist
+        shell: bash
+        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.32.0/cargo-dist-installer.sh | sh"
+      - name: 缓存 dist 工具
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cargo-dist-cache
+          path: ~/.cargo/bin/dist
+      - id: plan
+        env:
+          DIST_TAG: ${{ (!github.event.pull_request && github.ref_name) || '' }}
+        run: |
+          if [[ -n "$DIST_TAG" ]]; then
+            dist host --steps=create "--tag=$DIST_TAG" --output-format=json > plan-dist-manifest.json
+          else
+            dist plan --output-format=json > plan-dist-manifest.json
+          fi
+          echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+      - name: 上传规划清单
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-plan-dist-manifest
+          path: plan-dist-manifest.json
+
+  build-local-artifacts:
+    name: 编译平台二进制 (${{ join(matrix.targets, ', ') }})
+    needs:
+      - plan
+    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: md-outline-linux-x64
-            use_cross: false
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            artifact_name: md-outline-linux-arm64
-            use_cross: true
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: md-outline-darwin-arm64
-            use_cross: false
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: md-outline-darwin-x64
-            use_cross: false
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: md-outline-windows-x64.exe
-            use_cross: false
-
+      matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container && matrix.container.image || null }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DIST_TAG: ${{ needs.plan.outputs.tag }}
+      BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
     steps:
+      - name: 启用 Windows 长路径
+        run: git config --global core.longpaths true
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
-        with:
-          toolchain: "1.98.1"
-          targets: ${{ matrix.target }}
-      - uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2.87.13
-        if: ${{ matrix.use_cross }}
-        with:
-          tool: cross
-      - name: 编译 Release 二进制
-        shell: bash
+          submodules: recursive
+      - name: 容器环境非交互安装 Rust
+        if: ${{ matrix.container }}
         run: |
-          if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
+          if ! command -v cargo > /dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-          mkdir -p dist
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp target/${{ matrix.target }}/release/md-outline.exe dist/${{ matrix.artifact_name }}
-          else
-            cp target/${{ matrix.target }}/release/md-outline dist/${{ matrix.artifact_name }}
-          fi
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: artifacts-${{ matrix.target }}
-          path: dist/*
-          retention-days: 1
-
-  publish:
-    name: 创建 GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: 下载全部平台产物
+      - name: 安装 dist
+        run: ${{ matrix.install_dist.run }}
+      - name: 拉取本地制品
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          path: release-artifacts
+          pattern: artifacts-*
+          path: target/distrib/
           merge-multiple: true
-      - name: 生成 SHA256 校验和并创建 Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ github.ref_name }}
+      - name: 安装系统依赖
+        run: ${{ matrix.packages_install }}
+      - name: 编译平台制品
+        shell: bash
         run: |
-          cd release-artifacts
-          sha256sum md-outline* > SHA256SUMS
-          gh release create "$TAG_NAME" --generate-notes --title "$TAG_NAME" *
+          args=()
+          if [[ -n "$DIST_TAG" ]]; then
+            args+=(--tag="$DIST_TAG")
+          fi
+          dist build "${args[@]}" --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+      - id: cargo-dist
+        name: 提取上传路径
+        shell: bash
+        run: |
+          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
+          dist print-upload-files-from-manifest --manifest dist-manifest.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
+      - name: 上传构建制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-build-local-${{ join(matrix.targets, '_') }}
+          path: |
+            ${{ steps.cargo-dist.outputs.paths }}
+            ${{ env.BUILD_MANIFEST_NAME }}
+
+  build-global-artifacts:
+    name: 构建全局安装器与安装脚本
+    needs:
+      - plan
+      - build-local-artifacts
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DIST_TAG: ${{ needs.plan.outputs.tag }}
+      BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: 获取缓存的 dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cargo-dist-cache
+          path: ~/.cargo/bin/
+      - run: chmod +x ~/.cargo/bin/dist
+      - name: 获取局部制品
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: artifacts-*
+          path: target/distrib/
+          merge-multiple: true
+      - id: cargo-dist
+        shell: bash
+        run: |
+          args=(--output-format=json "--artifacts=global")
+          if [[ -n "$DIST_TAG" ]]; then
+            args+=(--tag="$DIST_TAG")
+          fi
+          dist build "${args[@]}" > dist-manifest.json
+          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
+          jq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          cp dist-manifest.json "$BUILD_MANIFEST_NAME"
+      - name: 上传全局制品
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-build-global
+          path: |
+            ${{ steps.cargo-dist.outputs.paths }}
+            ${{ env.BUILD_MANIFEST_NAME }}
+
+  host:
+    name: 创建 GitHub Release
+    needs:
+      - plan
+      - build-local-artifacts
+      - build-global-artifacts
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DIST_TAG: ${{ needs.plan.outputs.tag }}
+    runs-on: ubuntu-latest
+    outputs:
+      val: ${{ steps.host.outputs.manifest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: 获取缓存的 dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cargo-dist-cache
+          path: ~/.cargo/bin/
+      - run: chmod +x ~/.cargo/bin/dist
+      - name: 获取全部平台制品
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: artifacts-*
+          path: target/distrib/
+          merge-multiple: true
+      - id: host
+        shell: bash
+        run: |
+          args=(--steps=upload --steps=release --output-format=json)
+          if [[ -n "$DIST_TAG" ]]; then
+            args+=(--tag="$DIST_TAG")
+          fi
+          dist host "${args[@]}" > dist-manifest.json
+          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+      - name: 上传最终 dist-manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-dist-manifest
+          path: dist-manifest.json
+      - name: 下载 GitHub Artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: artifacts-*
+          path: artifacts
+          merge-multiple: true
+      - name: 清理中间清单
+        run: rm -f artifacts/*-dist-manifest.json
+      - name: 正式发布 GitHub Release
+        env:
+          PRERELEASE_FLAG: "${{ fromJson(steps.host.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.host.outputs.manifest).announcement_title }}"
+          ANNOUNCEMENT_BODY: "${{ fromJson(steps.host.outputs.manifest).announcement_github_body }}"
+          RELEASE_COMMIT: "${{ github.sha }}"
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
+          gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+
+  announce:
+    name: 广播发布通知
+    needs:
+      - plan
+      - host
+    if: ${{ always() && needs.host.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
