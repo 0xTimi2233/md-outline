@@ -1,8 +1,5 @@
 name: Checks
 
-# 测试与构建门禁：由 ci.yaml 通过 workflow_call 编排调用，
-# 触发时机（PR / push main / merge queue / 定时）由 CI workflow 统一管理。
-
 on:
   workflow_call:
 

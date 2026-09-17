@@ -1,8 +1,5 @@
 name: Cache Cleanup
 
-# PR 缓存生命周期管理：当 PR 合并或关闭时，自动清除该 PR 独占的分支缓存，
-# 确保仓库仅维护 main 分支的有效基线缓存，防止存储池因历史 PR 堆积膨胀。
-
 on:
   pull_request:
     types: [closed]
@@ -16,7 +13,7 @@ jobs:
     name: 清理已关闭 PR 缓存
     runs-on: ubuntu-latest
     steps:
-      - name: 删除当前 PR 命名空间下的所有缓存
+      - name: 删除当前 PR 缓存
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

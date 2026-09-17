@@ -1,10 +1,5 @@
 name: Release
 
-# 本文件由 cargo-dist 生成并手工进行安全加固：
-# 1. 所有 action 严格锁定 commit SHA
-# 2. 顶层权限降为 contents: read，仅 host 发版 job 持有写权限
-# 3. tag 参数经环境变量传入 shell，避免 github.ref_name 注入
-
 permissions:
   contents: read
 

@@ -1,17 +1,16 @@
-[package]
-name = "md-outline"
+[workspace]
+resolver = "3"
+members = ["."]
+
+[workspace.package]
 version = "0.1.1"
 edition = "2024"
 rust-version = "1.98"
 authors = ["0xTimi2233"]
-description = "A fast, AST-based Markdown outline CLI that extracts clean hierarchical heading trees with exact line numbers."
 license = "MIT"
-readme = "README.md"
 repository = "https://github.com/0xTimi2233/md-outline"
-keywords = ["markdown", "outline", "toc", "cli", "tree"]
-categories = ["command-line-utilities", "text-processing"]
 
-[lints.clippy]
+[workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
@@ -19,8 +18,24 @@ unwrap_in_result = "deny"
 dbg_macro = "deny"
 todo = "deny"
 
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "forbid"
+
+[package]
+name = "md-outline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "A fast, AST-based Markdown outline CLI that extracts clean hierarchical heading trees with exact line numbers."
+keywords = ["markdown", "outline", "toc", "cli", "tree"]
+categories = ["command-line-utilities", "text-processing"]
+
+[lints]
+workspace = true
 
 [dependencies]
 clap = { version = "4.5.31", features = ["derive"] }
@@ -42,8 +57,9 @@ strip = true
 [profile.dist]
 inherits = "release"
 
-[package.metadata.dist]
+[workspace.metadata.dist]
 allow-dirty = ["ci"]
+
 cargo-dist-version = "0.32.0"
 ci = "github"
 targets = [
@@ -55,7 +71,7 @@ targets = [
 ]
 installers = ["shell", "powershell"]
 
-[package.metadata.dist.github-custom-runners]
+[workspace.metadata.dist.github-custom-runners]
 global = "ubuntu-latest"
 x86_64-unknown-linux-gnu = "ubuntu-latest"
 aarch64-unknown-linux-gnu = "ubuntu-latest"

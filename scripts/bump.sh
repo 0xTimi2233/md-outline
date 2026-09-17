@@ -9,7 +9,7 @@ fi
 
 CARGO_TOML="$(dirname "$0")/../Cargo.toml"
 
-# Update version in Cargo.toml [package] section
+# Update version in Cargo.toml [workspace.package] section
 sed -i '' -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+.*\"/version = \"${VERSION}\"/" "$CARGO_TOML"
 
 echo "版本号已成功同步更新至 ${VERSION}"
