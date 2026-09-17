@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   audit:
-    name: 依赖与许可证审计
+    name: 依赖与安全审计
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -17,5 +17,5 @@ jobs:
       - uses: taiki-e/install-action@84f5ac3124727fb3d284d4d22ee9ab3654fd09a6 # v2.87.7
         with:
           tool: cargo-deny
-      - name: 检查依赖合规与已知漏洞
-        run: cargo deny check
+      - name: 检查依赖安全与合规审计
+        run: cargo deny check advisories bans sources
