@@ -25,8 +25,9 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: 安装 dist
-        shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.32.0/cargo-dist-installer.sh | sh"
+        uses: taiki-e/install-action@6cd13508893c0e7eab5f273c2575d3859bd7229a # v2.85.12
+        with:
+          tool: cargo-dist@0.32.0
       - name: 缓存 dist 工具
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -77,7 +78,9 @@ jobs:
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
       - name: 安装 dist
-        run: ${{ matrix.install_dist.run }}
+        uses: taiki-e/install-action@6cd13508893c0e7eab5f273c2575d3859bd7229a # v2.85.12
+        with:
+          tool: cargo-dist@0.32.0
       - name: 拉取本地制品
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
