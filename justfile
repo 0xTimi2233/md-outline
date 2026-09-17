@@ -23,6 +23,18 @@ test:
 audit:
     cargo deny check advisories bans sources
 
+# Build optimized release binary locally
+build:
+    cargo build --release
+
+# Synchronize project version (Example: just bump 0.1.1)
+bump version:
+    @bash scripts/bump.sh {{version}}
+
+# Download and install latest release binary from GitHub to ~/.local/bin
+update:
+    @bash scripts/update.sh
+
 # Sync GitHub repository standard labels
 sync-labels repo:
     #!/usr/bin/env bash

@@ -75,7 +75,19 @@ fn test_cli_depth_filter_success() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_cli_stdin_pipe_success() -> anyhow::Result<()> {
+fn test_cli_stdin_pipe_without_dash_success() -> anyhow::Result<()> {
+    let mut cmd = Command::cargo_bin("md-outline")?;
+    cmd.write_stdin(SAMPLE_MARKDOWN)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("L1    Root Title"))
+        .stdout(predicate::str::contains("L5    ├── Section Alpha"));
+
+    Ok(())
+}
+
+#[test]
+fn test_cli_stdin_pipe_with_dash_success() -> anyhow::Result<()> {
     let mut cmd = Command::cargo_bin("md-outline")?;
     cmd.arg("-")
         .write_stdin(SAMPLE_MARKDOWN)

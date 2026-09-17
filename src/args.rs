@@ -5,9 +5,9 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(name = "md-outline", version, about, long_about = None)]
 pub struct CliArgs {
-    /// Target Markdown file to inspect (use '-' for stdin)
+    /// Target Markdown file to inspect (reads from standard input if omitted or set to '-')
     #[arg(value_name = "FILE")]
-    pub file: PathBuf,
+    pub file: Option<PathBuf>,
 
     /// Maximum heading depth to display (1-6)
     #[arg(short = 'd', long = "depth", value_name = "DEPTH", default_value_t = 6)]
