@@ -8,6 +8,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.98.1"
 
 jobs:
   fmt:
@@ -19,7 +20,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
-          toolchain: "1.98.1"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt
       - run: cargo fmt --all --check
 
@@ -32,7 +33,7 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
-          toolchain: "1.98.1"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo clippy --all-targets --all-features -- -D warnings
@@ -50,6 +51,6 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
-          toolchain: "1.98.1"
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo test --all-features --locked
