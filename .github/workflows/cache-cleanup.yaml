@@ -1,0 +1,22 @@
+name: Cache Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: 清理已关闭 PR 缓存
+    runs-on: ubuntu-latest
+    steps:
+      - name: 删除当前 PR 缓存
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh cache list --ref "refs/pull/${PR_NUMBER}/merge" --limit 100 --json id --jq '.[].id' | xargs -r -n 1 gh cache delete

@@ -1,28 +1,28 @@
 # 开发者协作手册与贡献指南
 
-本项目遵循**云端统一构建与自动化分发哲学**。本地开发专注于功能实现与质量门禁（TDD），所有生产级发布产物均由 GitHub Actions CI/CD 流水线在干净的多平台环境中自动化编译、校验、签名并发布。
+本项目遵循云端统一构建与自动化分发哲学。本地开发专注于功能实现与质量门禁，所有生产级发布产物均由 GitHub Actions CI/CD 流水线在干净的多平台环境中自动化编译、校验、签名并发布。
 
 ## 一、开发环境准备
 
 系统依赖以下标准工具链：
 
-- [Rust](https://www.rust-lang.org) (v1.98.0+ / Edition 2024)：核心系统编程语言
+- [Rust](https://www.rust-lang.org) v1.98.0+ 与 Edition 2024：核心系统编程语言
 - [just](https://github.com/casey/just)：统一工程命令调度器
 - [cargo-deny](https://github.com/EmbarkStudios/cargo-deny)：依赖安全性与合规审计工具
-- [GitHub CLI (gh)](https://cli.github.com)：用于自动化 PR 创建、Release 管理与跨平台产物同步
+- [GitHub CLI](https://cli.github.com)：用于自动化 PR 创建、Release 管理与跨平台产物同步
 
 ## 二、本地开发与质量门禁
 
-日常开发遵循**双层垂直测试驱动开发（TDD）**与静态分析约束，提交代码前必须确保门禁 100% 全绿：
+日常开发遵循双层垂直测试驱动开发与静态分析约束，提交代码前必须确保门禁 100% 全绿：
 
 ```bash
-# 执行全量质量门禁（代码格式 + Clippy 静态检查 + 单元/集成测试 + 安全审计）
+# 执行全量质量门禁：代码格式、Clippy 静态检查、单元与集成测试、安全审计
 just ci
 
 # 单项命令
 just fmt    # 自动格式化代码
 just check  # 检查代码格式规范
-just lint   # Clippy 严格静态分析（禁止任何 warnings）
+just lint   # Clippy 严格静态分析，严禁任何 warnings
 just test   # 执行全部单元测试与 CLI 端到端验收测试
 just audit  # 依赖漏洞与合规审计
 ```
@@ -35,13 +35,13 @@ just audit  # 依赖漏洞与合规审计
 sequenceDiagram
     participant Dev as 开发者
     participant Local as 本地环境
-    participant Remote as GitHub (PR & CI)
+    participant Remote as GitHub
     participant Main as main 分支
 
     Dev->>Local: 创建特性分支 feat/xxx
     Dev->>Local: 遵循 TDD 编码并运行 just ci
     Local->>Remote: git push 并执行 gh pr create
-    Remote->>Remote: GitHub Actions 触发 Checks & Security 自动化检查
+    Remote->>Remote: GitHub Actions 触发 Checks 与 Security 自动化检查
     Note over Remote: 格式、Clippy、跨平台测试、安全审计全绿
     Remote->>Main: 审查通过并合并 PR
 ```
@@ -58,10 +58,10 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Merge[PR 合并至 main] --> CheckoutMain[切换至 main 并拉取最新代码]
-    CheckoutMain --> BumpVersion[执行 just bump <version>]
-    BumpVersion --> Commit[git commit -m 'chore(release): bump version to x.y.z']
-    Commit --> Tag[git tag vx.y.z && git push origin vx.y.z]
-    Tag --> CloudRelease[GitHub Actions release.yaml 自动构建全平台二进制并发布 Release]
+    CheckoutMain --> BumpVersion[执行 just bump]
+    BumpVersion --> Commit[创建发版提交]
+    Commit --> Tag[打标并推送 Tag]
+    Tag --> CloudRelease[GitHub Actions 自动构建全平台二进制并发布 Release]
     CloudRelease --> PullInstall[在本地执行 just update 从远程获取最新二进制]
 ```
 
@@ -72,22 +72,21 @@ flowchart TD
 
 2. **同步版本号**：
    ```bash
-   just bump <version>  # 示例: just bump 0.1.1
+   just bump 0.1.2
    ```
 
 3. **创建独立发布提交并推送**：
    ```bash
    git add Cargo.toml
-   git commit -m "chore(release): bump version to <version>"
+   git commit -m "chore(release): bump version to 0.1.2"
    git push origin main
    ```
 
 4. **打标并触发云端多平台构建**：
    ```bash
-   git tag v<version>
-   git push origin v<version>
+   git tag v0.1.2 && git push origin v0.1.2
    ```
-   推送 Tag 后，GitHub Actions 自动触发 `release.yaml` 流水线，完成 macOS (Apple Silicon / Intel)、Linux (x86_64 / arm64) 以及 Windows 平台的编译、SHA256 校验和生成并发布至 GitHub Release。
+   推送 Tag 后，GitHub Actions 自动触发 `release.yml` 流水线，完成 macOS Apple Silicon 与 Intel、Linux x86_64 与 ARM64 以及 Windows 平台的编译、SHA256 校验和生成并发布至 GitHub Release。
 
 ## 五、从远程拉取安装与本地运行态更新
 
