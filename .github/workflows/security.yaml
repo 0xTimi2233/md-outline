@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@6cd13508893c0e7eab5f273c2575d3859bd7229a # v2.85.12
+      - uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2.87.13
         with:
           tool: cargo-deny
       - name: 检查依赖合规与安全漏洞
@@ -50,11 +50,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: github/codeql-action/init@37f2634a92ba38a0926ef79a0748ac8ae7d95ab2 # v4.37.8
+      - uses: github/codeql-action/init@1739f9933caea2a8c3d8205fbc35850e05ee71ee # v4.38.0
         with:
           languages: rust
           build-mode: none
           queries: ${{ (github.event_name == 'schedule' || github.ref == 'refs/heads/main') && 'security-extended' || '' }}
-      - uses: github/codeql-action/analyze@37f2634a92ba38a0926ef79a0748ac8ae7d95ab2 # v4.37.8
+      - uses: github/codeql-action/analyze@1739f9933caea2a8c3d8205fbc35850e05ee71ee # v4.38.0
         with:
           category: "/language:rust"
