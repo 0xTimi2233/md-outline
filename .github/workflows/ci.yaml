@@ -11,8 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.head.sha || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.98.1"
 
 jobs:
   checks:
@@ -25,3 +29,21 @@ jobs:
       contents: read
       security-events: write
     uses: ./.github/workflows/security.yaml
+
+  gate:
+    name: 合并门禁
+    needs: [checks, security]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 校验上游检查结果
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+        run: |
+          echo "检查与测试：$CHECKS_RESULT"
+          echo "安全审计：$SECURITY_RESULT"
+          if [ "$CHECKS_RESULT" != "success" ] || [ "$SECURITY_RESULT" != "success" ]; then
+            echo "上游检查未全部通过，阻断合并"
+            exit 1
+          fi
