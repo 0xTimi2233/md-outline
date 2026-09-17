@@ -7,9 +7,13 @@ if [[ -z "$VERSION" || ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
   exit 1
 fi
 
-CARGO_TOML="$(dirname "$0")/../Cargo.toml"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CARGO_TOML="${ROOT_DIR}/Cargo.toml"
 
 # Update version in Cargo.toml [workspace.package] section
 sed -i '' -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+.*\"/version = \"${VERSION}\"/" "$CARGO_TOML"
 
-echo "版本号已成功同步更新至 ${VERSION}"
+# Update Cargo.lock to match new package version
+(cd "${ROOT_DIR}" && cargo check --quiet)
+
+echo "版本号已成功同步更新至 ${VERSION}（Cargo.lock 已同步刷新）"
