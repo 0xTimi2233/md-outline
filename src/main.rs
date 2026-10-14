@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 use md_outline::args::CliArgs;
-use md_outline::formatter::format_tree;
+use md_outline::formatter::format_headings;
 use md_outline::parser::parse_headings;
 use std::fs;
 use std::io::{self, IsTerminal, Read};
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     };
 
     let headings = parse_headings(&content, args.depth);
-    let output = format_tree(&headings);
+    let output = format_headings(&headings, args.format).context("Failed to format headings")?;
 
     if !output.is_empty() {
         println!("{output}");

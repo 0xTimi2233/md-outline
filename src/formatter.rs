@@ -1,6 +1,41 @@
+use crate::args::OutputFormat;
 use crate::parser::HeadingItem;
 
-/// Formats a list of HeadingItems into a human-readable ASCII/Unicode tree with aligned line numbers.
+/// Formats headings according to the specified output format.
+pub fn format_headings(
+    headings: &[HeadingItem],
+    format: OutputFormat,
+) -> Result<String, serde_json::Error> {
+    match format {
+        OutputFormat::Indent => Ok(format_indent(headings)),
+        OutputFormat::Tree => Ok(format_tree(headings)),
+        OutputFormat::Json => format_json(headings),
+    }
+}
+
+/// Formats headings using token-saving 2-space indentation with line number prefixes.
+pub fn format_indent(headings: &[HeadingItem]) -> String {
+    if headings.is_empty() {
+        return String::new();
+    }
+
+    let min_level = headings.iter().map(|h| h.level).min().unwrap_or(1);
+    let mut lines = Vec::with_capacity(headings.len());
+
+    for current in headings {
+        let depth = (current.level.saturating_sub(min_level)) as usize;
+        lines.push(format!(
+            "{}: {}{}",
+            current.line,
+            "  ".repeat(depth),
+            current.text
+        ));
+    }
+
+    lines.join("\n")
+}
+
+/// Formats headings into a human-readable Unicode tree with aligned line numbers.
 pub fn format_tree(headings: &[HeadingItem]) -> String {
     if headings.is_empty() {
         return String::new();
@@ -40,28 +75,27 @@ pub fn format_tree(headings: &[HeadingItem]) -> String {
             }
         }
 
+        let line_prefix = format!("{}:", current.line);
         lines.push(format!(
-            "L{:<4} {}{}",
-            current.line, tree_prefix, current.text
+            "{:<4} {}{}",
+            line_prefix, tree_prefix, current.text
         ));
     }
 
     lines.join("\n")
 }
 
+/// Formats headings into a formatted JSON array string.
+pub fn format_json(headings: &[HeadingItem]) -> Result<String, serde_json::Error> {
+    serde_json::to_string_pretty(headings)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_format_tree_empty() {
-        let result = format_tree(&[]);
-        assert_eq!(result, "");
-    }
-
-    #[test]
-    fn test_format_tree_hierarchy() {
-        let headings = vec![
+    fn sample_headings() -> Vec<HeadingItem> {
+        vec![
             HeadingItem {
                 level: 1,
                 line: 1,
@@ -87,16 +121,73 @@ mod tests {
                 line: 18,
                 text: "Child B".to_string(),
             },
-        ];
+        ]
+    }
 
+    #[test]
+    fn test_format_indent_empty() {
+        assert_eq!(format_indent(&[]), "");
+    }
+
+    #[test]
+    fn test_format_indent_hierarchy() {
+        let headings = sample_headings();
+        let result = format_indent(&headings);
+        let expected = "\
+1: Root
+5:   Child A
+8:     Grandchild A1
+11:     Grandchild A2
+18:   Child B";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_format_tree_empty() {
+        assert_eq!(format_tree(&[]), "");
+    }
+
+    #[test]
+    fn test_format_tree_hierarchy() {
+        let headings = sample_headings();
         let result = format_tree(&headings);
         let expected = "\
-L1    Root
-L5    ├── Child A
-L8    │   ├── Grandchild A1
-L11   │   └── Grandchild A2
-L18   └── Child B";
-
+1:   Root
+5:   ├── Child A
+8:   │   ├── Grandchild A1
+11:  │   └── Grandchild A2
+18:  └── Child B";
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_format_json_empty() {
+        let result = format_json(&[]).unwrap_or_default();
+        assert_eq!(result, "[]");
+    }
+
+    #[test]
+    fn test_format_json_hierarchy() {
+        let headings = sample_headings();
+        let json_str = format_json(&headings).unwrap_or_default();
+        let deserialized: Vec<HeadingItem> = serde_json::from_str(&json_str).unwrap_or_default();
+        assert_eq!(deserialized, headings);
+    }
+
+    #[test]
+    fn test_format_headings_router() {
+        let headings = sample_headings();
+        assert_eq!(
+            format_headings(&headings, OutputFormat::Indent).unwrap_or_default(),
+            format_indent(&headings)
+        );
+        assert_eq!(
+            format_headings(&headings, OutputFormat::Tree).unwrap_or_default(),
+            format_tree(&headings)
+        );
+        assert_eq!(
+            format_headings(&headings, OutputFormat::Json).unwrap_or_default(),
+            format_json(&headings).unwrap_or_default()
+        );
     }
 }

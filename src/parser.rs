@@ -1,7 +1,8 @@
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use serde::{Deserialize, Serialize};
 
 /// Represents a parsed Markdown heading with depth, 1-based line number, and clean text.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeadingItem {
     pub level: u8,
     pub line: usize,
