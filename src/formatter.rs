@@ -13,17 +13,22 @@ pub fn format_headings(
     }
 }
 
-/// Formats headings into standard Markdown syntax with 6-digit right-aligned line numbers.
+/// Formats headings into standard Markdown syntax with line numbers.
 pub fn format_markdown(headings: &[HeadingItem]) -> String {
     if headings.is_empty() {
         return String::new();
     }
 
+    let max_line = headings.iter().map(|h| h.line).max().unwrap_or(1);
+    let max_prefix_len = format!("{}:", max_line).len();
     let mut lines = Vec::with_capacity(headings.len());
 
     for current in headings {
         let hashes = "#".repeat(current.level as usize);
-        lines.push(format!("{:>6}: {} {}", current.line, hashes, current.text));
+        let prefix = format!("{}:", current.line);
+        let pad_len = max_prefix_len.saturating_sub(prefix.len()) + 1;
+        let pad = " ".repeat(pad_len);
+        lines.push(format!("{}{}{} {}", prefix, pad, hashes, current.text));
     }
 
     lines.join("\n")
@@ -36,6 +41,8 @@ pub fn format_tree(headings: &[HeadingItem]) -> String {
     }
 
     let min_level = headings.iter().map(|h| h.level).min().unwrap_or(1);
+    let max_line = headings.iter().map(|h| h.line).max().unwrap_or(1);
+    let max_prefix_len = format!("{}:", max_line).len();
     let mut lines = Vec::with_capacity(headings.len());
 
     for (i, current) in headings.iter().enumerate() {
@@ -69,10 +76,10 @@ pub fn format_tree(headings: &[HeadingItem]) -> String {
             }
         }
 
-        lines.push(format!(
-            "{:>6}:  {}{}",
-            current.line, tree_prefix, current.text
-        ));
+        let prefix = format!("{}:", current.line);
+        let pad_len = max_prefix_len.saturating_sub(prefix.len()) + 1;
+        let pad = " ".repeat(pad_len);
+        lines.push(format!("{}{}{}{}", prefix, pad, tree_prefix, current.text));
     }
 
     lines.join("\n")
@@ -127,11 +134,11 @@ mod tests {
         let headings = sample_headings();
         let result = format_markdown(&headings);
         let expected = [
-            "     1: # Root",
-            "     5: ## Child A",
-            "     8: ### Grandchild A1",
-            "    11: ### Grandchild A2",
-            "    18: ## Child B",
+            "1:  # Root",
+            "5:  ## Child A",
+            "8:  ### Grandchild A1",
+            "11: ### Grandchild A2",
+            "18: ## Child B",
         ]
         .join("\n");
         assert_eq!(result, expected);
@@ -147,11 +154,11 @@ mod tests {
         let headings = sample_headings();
         let result = format_tree(&headings);
         let expected = [
-            "     1:  Root",
-            "     5:  ├── Child A",
-            "     8:  │   ├── Grandchild A1",
-            "    11:  │   └── Grandchild A2",
-            "    18:  └── Child B",
+            "1:  Root",
+            "5:  ├── Child A",
+            "8:  │   ├── Grandchild A1",
+            "11: │   └── Grandchild A2",
+            "18: └── Child B",
         ]
         .join("\n");
         assert_eq!(result, expected);
