@@ -7,29 +7,23 @@ pub fn format_headings(
     format: OutputFormat,
 ) -> Result<String, serde_json::Error> {
     match format {
-        OutputFormat::Indent => Ok(format_indent(headings)),
+        OutputFormat::Markdown => Ok(format_markdown(headings)),
         OutputFormat::Tree => Ok(format_tree(headings)),
         OutputFormat::Json => format_json(headings),
     }
 }
 
-/// Formats headings using token-saving 2-space indentation with line number prefixes.
-pub fn format_indent(headings: &[HeadingItem]) -> String {
+/// Formats headings into standard Markdown syntax with 6-digit right-aligned line numbers.
+pub fn format_markdown(headings: &[HeadingItem]) -> String {
     if headings.is_empty() {
         return String::new();
     }
 
-    let min_level = headings.iter().map(|h| h.level).min().unwrap_or(1);
     let mut lines = Vec::with_capacity(headings.len());
 
     for current in headings {
-        let depth = (current.level.saturating_sub(min_level)) as usize;
-        lines.push(format!(
-            "{}: {}{}",
-            current.line,
-            "  ".repeat(depth),
-            current.text
-        ));
+        let hashes = "#".repeat(current.level as usize);
+        lines.push(format!("{:>6}: {} {}", current.line, hashes, current.text));
     }
 
     lines.join("\n")
@@ -75,10 +69,9 @@ pub fn format_tree(headings: &[HeadingItem]) -> String {
             }
         }
 
-        let line_prefix = format!("{}:", current.line);
         lines.push(format!(
-            "{:<4} {}{}",
-            line_prefix, tree_prefix, current.text
+            "{:>6}:  {}{}",
+            current.line, tree_prefix, current.text
         ));
     }
 
@@ -125,20 +118,22 @@ mod tests {
     }
 
     #[test]
-    fn test_format_indent_empty() {
-        assert_eq!(format_indent(&[]), "");
+    fn test_format_markdown_empty() {
+        assert_eq!(format_markdown(&[]), "");
     }
 
     #[test]
-    fn test_format_indent_hierarchy() {
+    fn test_format_markdown_hierarchy() {
         let headings = sample_headings();
-        let result = format_indent(&headings);
-        let expected = "\
-1: Root
-5:   Child A
-8:     Grandchild A1
-11:     Grandchild A2
-18:   Child B";
+        let result = format_markdown(&headings);
+        let expected = [
+            "     1: # Root",
+            "     5: ## Child A",
+            "     8: ### Grandchild A1",
+            "    11: ### Grandchild A2",
+            "    18: ## Child B",
+        ]
+        .join("\n");
         assert_eq!(result, expected);
     }
 
@@ -151,12 +146,14 @@ mod tests {
     fn test_format_tree_hierarchy() {
         let headings = sample_headings();
         let result = format_tree(&headings);
-        let expected = "\
-1:   Root
-5:   ├── Child A
-8:   │   ├── Grandchild A1
-11:  │   └── Grandchild A2
-18:  └── Child B";
+        let expected = [
+            "     1:  Root",
+            "     5:  ├── Child A",
+            "     8:  │   ├── Grandchild A1",
+            "    11:  │   └── Grandchild A2",
+            "    18:  └── Child B",
+        ]
+        .join("\n");
         assert_eq!(result, expected);
     }
 
@@ -178,8 +175,8 @@ mod tests {
     fn test_format_headings_router() {
         let headings = sample_headings();
         assert_eq!(
-            format_headings(&headings, OutputFormat::Indent).unwrap_or_default(),
-            format_indent(&headings)
+            format_headings(&headings, OutputFormat::Markdown).unwrap_or_default(),
+            format_markdown(&headings)
         );
         assert_eq!(
             format_headings(&headings, OutputFormat::Tree).unwrap_or_default(),
