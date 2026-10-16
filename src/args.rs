@@ -5,9 +5,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
 #[value(rename_all = "kebab-case")]
 pub enum OutputFormat {
-    /// Token-saving 2-space indentation (default)
+    /// Markdown heading outline with aligned line numbers (default)
     #[default]
-    Indent,
+    Markdown,
     /// Classic Unicode tree hierarchy
     Tree,
     /// JSON array representation
@@ -27,6 +27,6 @@ pub struct CliArgs {
     pub depth: u8,
 
     /// Output formatting mode
-    #[arg(short = 'f', long = "format", value_enum, default_value_t = OutputFormat::Indent)]
+    #[arg(short = 'f', long = "format", value_enum, default_value_t = OutputFormat::Markdown)]
     pub format: OutputFormat,
 }
